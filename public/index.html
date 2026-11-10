@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>卡牌對戰｜v1.0.1 基礎功能修復版（以 v0.8 為基礎）</title>
+<style>
+:root{
+ --bg:#10151d;--panel:#202b39;--panel2:#29384a;--line:#718096;--gold:#d9b66f;
+ --text:#edf2f7;--muted:#aeb9c8;--red:#b94b52;--blue:#4e83b8;--green:#4f9877;
+ --card:#e8dfc9;--ink:#27251f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:"Noto Sans TC",system-ui,sans-serif}
+button{font:inherit;cursor:pointer}
+#app{width:100vw;height:100dvh;min-width:320px;min-height:480px;display:grid;grid-template-rows:15% minmax(0,1fr) 15%;gap:6px;padding:7px;overflow:hidden}
+.player-strip{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,22%);gap:7px;min-height:0}
+.player-strip.enemy{grid-template-columns:minmax(110px,22%) minmax(0,1fr)}
+.player-meta,.hand-panel,.battle-board,.side-panel{background:linear-gradient(145deg,#263446,#1a2431);border:1px solid #52647a;border-radius:9px;min-width:0;min-height:0;overflow:hidden}
+.player-meta{display:flex;align-items:center;gap:9px;padding:6px 10px}
+.avatar{width:clamp(34px,5vw,54px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#d8c18a,#705b38 65%,#332b21);border:2px solid var(--gold);font-size:clamp(17px,2.4vw,25px);flex:none}
+.meta-content{min-width:0;flex:1}
+.name-row{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:clamp(11px,1.5vw,15px)}
+.hp-track{height:8px;background:#111923;border-radius:8px;margin:5px 0 3px;overflow:hidden;border:1px solid #536173}
+.hp-fill{height:100%;width:100%;background:linear-gradient(90deg,#9d343d,#e16c69);transition:width .2s}
+.meta-small{font-size:clamp(9px,1.1vw,12px);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hand-panel{padding:5px 7px;display:flex;flex-direction:column;gap:4px}
+.hand-head{display:flex;justify-content:space-between;align-items:center;font-size:clamp(10px,1.25vw,13px);color:#e8d6a9}
+.hand-viewport{flex:1;min-height:0;overflow:hidden;position:relative}
+.hand-track{height:100%;display:flex;gap:5px;align-items:stretch;width:max-content;max-width:none}
+.card{width:clamp(66px,8.2vw,104px);height:100%;max-height:none;flex:none;border-radius:5px;background:linear-gradient(155deg,#f4ecd9,#d6c8a9);border:2px solid #b69a63;color:var(--ink);padding:4px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 2px 5px #0008;position:relative;overflow:hidden;text-align:left}
+.card.selected{outline:3px solid #f4d477;transform:translateY(-2px)}
+.card .ct{font-weight:800;font-size:clamp(9px,1.05vw,12px);line-height:1.2}
+.card .kind{font-size:9px;color:#6b5940}
+.card .desc{font-size:clamp(8px,.9vw,10px);line-height:1.15;overflow:hidden}
+.card .cost{font-weight:800;font-size:10px;text-align:right}
+.empty{font-size:11px;color:#8290a1;align-self:center;padding:0 8px}
+#middle{display:grid;grid-template-columns:clamp(76px,12vw,140px) minmax(0,1fr) clamp(76px,12vw,140px);gap:6px;min-height:0;overflow:hidden}
+.side-panel{padding:6px 5px;display:flex;flex-direction:column;gap:7px}
+.left-rail{min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.left-rail .side-panel{flex:0 0 auto}
+.left-rail .round-panel{min-height:26%;justify-content:flex-start}
+.left-rail .enemy-status-panel{flex:1;min-height:0}
+
+.side-title{font-size:clamp(9px,1vw,12px);color:var(--gold);text-align:center;font-weight:700}
+.stat{background:#111b27;border:1px solid #42536a;border-radius:5px;padding:5px 3px;text-align:center}
+.stat b{display:block;font-size:clamp(13px,1.8vw,19px)}
+.stat span{font-size:9px;color:var(--muted)}
+#round{font-size:clamp(14px,2vw,21px);color:#f1d48c}
+.battle-board{display:grid;grid-template-rows:1fr auto 1fr;gap:5px;padding:7px;position:relative}
+.action-zone{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;min-height:0}
+.slot{border:1px dashed #718096;border-radius:6px;background:linear-gradient(145deg,#34465a88,#172332aa);min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden;padding:3px;position:relative}
+.slot .slot-num{font-size:clamp(10px,1.3vw,14px);color:#e5cc8c}
+.slot .slot-label{font-size:clamp(8px,.95vw,10px);color:#aeb9c8}
+.slot.filled{border-style:solid;border-color:#c5a35f;background:#3a3b35}
+.slot .placed{font-size:clamp(9px,1.2vw,13px);font-weight:700;text-align:center;overflow:hidden;max-width:100%;overflow-wrap:anywhere}
+.slot button{border:0;border-radius:4px;padding:2px 5px;background:#6b4b34;color:#fff;font-size:9px}
+.board-divider{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);position:relative}
+.board-divider span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#202d3c;padding:2px 10px;color:#e8d6a9;font-size:clamp(9px,1vw,12px);white-space:nowrap}
+.log{font-size:10px;color:#b8c4d2;line-height:1.35;max-height:55px;overflow:hidden}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.info-chip{font-size:9px;background:#111b27;border-radius:4px;padding:4px;text-align:center;color:#cbd5e1;overflow:hidden}
+.bottom-controls{display:flex;gap:5px;align-items:center;justify-content:center;flex-wrap:wrap}
+.bottom-controls button,.modal button{border:1px solid #9b8352;border-radius:5px;background:linear-gradient(#806b45,#59472d);color:#fff;padding:6px 10px;font-size:clamp(10px,1.2vw,13px)}
+.bottom-controls button.secondary{background:#33465b;border-color:#65788d}
+.bottom-controls button:disabled{opacity:.35;cursor:not-allowed}
+#toast{position:fixed;left:50%;bottom:13%;transform:translateX(-50%);background:#111d2a;border:1px solid var(--gold);border-radius:7px;padding:8px 13px;font-size:12px;display:none;z-index:10;max-width:90vw}
+.modal-wrap{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:20;padding:15px}
+.modal{width:min(440px,96vw);max-height:80vh;overflow:auto;background:#202d3c;border:1px solid var(--gold);border-radius:10px;padding:15px;box-shadow:0 10px 40px #000a}
+.modal h2{font-size:17px;margin:0 0 10px;color:#f0d99e}
+.modal p{font-size:12px;color:#cbd5e1}
+.modal .choice{display:flex;gap:8px;align-items:center;padding:8px;margin:5px 0;border:1px solid #52647a;border-radius:6px;background:#29394b;font-size:12px}
+@media(max-width:600px){
+ #app{padding:4px;gap:4px;grid-template-rows:16% minmax(0,1fr) 16%}
+ #middle{grid-template-columns:70px minmax(0,1fr) 70px;gap:4px}
+ .side-panel{padding:4px 2px;gap:4px}
+ .player-meta{padding:4px}
+ .avatar{width:30px}
+ .card{width:66px}
+ .battle-board{padding:4px;gap:4px}
+ .slot{padding:1px}
+ .bottom-controls button{padding:5px 7px}
+}
+
+/* v1.1 additions: compact hand, scrollable collection and modal panels */
+.hand-viewport{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#8b754c #172332}
+.hand-track{gap:3px}
+.card{width:clamp(50px,calc((75vw - 50px)/13),76px);min-width:50px;max-width:76px;aspect-ratio:2/3;height:auto;min-height:0;align-self:center}
+.card .ct{font-size:clamp(8px,.82vw,11px)}
+.card .kind{font-size:8px}
+.card .desc{font-size:clamp(7px,.72vw,9px);line-height:1.12}
+.card .cost{font-size:9px}
+#modalWrap .modal{width:min(680px,96vw);max-height:86vh}
+#modalChoices{max-height:58vh;overflow:auto}
+.modal .choice{display:flex!important;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.deck-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:7px;margin:5px 0;border:1px solid #52647a;border-radius:6px;background:#29394b;font-size:12px}
+.deck-row small{display:block;color:#bdc8d6}
+.deck-row button,.modal .mini-btn{padding:3px 8px;font-size:11px}
+.deck-actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.deck-summary{position:sticky;bottom:0;background:#202d3c;padding:8px;border-top:1px solid #65788d;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+@media(max-width:900px){.card{width:clamp(58px,7.2vw,70px)}}
+@media(max-width:600px){.card{width:58px;min-width:58px}}
+
+
+/* 底部手牌：卡牌高度必須配合手牌視窗，避免 2:3 長卡被上下裁切 */
+#myHandViewport{height:100%;min-height:0;overflow-x:auto;overflow-y:hidden;}
+#myHand{height:100%;min-height:0;align-items:stretch;}
+#myHand .card{
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  aspect-ratio:auto !important;
+  align-self:stretch !important;
+  justify-content:center !important;
+  gap:7px !important;
+  padding:4px 3px !important;
+  overflow:hidden !important;
+  flex-direction:column !important;
+}
+#myHand .card .ct{
+  display:block !important;
+  flex:0 1 auto !important;
+  min-height:0 !important;
+  max-height:2.4em;
+  overflow:hidden !important;
+  text-align:center !important;
+  font-size:clamp(8px, .78vw, 11px) !important;
+  line-height:1.15 !important;
+  overflow-wrap:anywhere !important;
+}
+#myHand .card .cost{
+  display:block !important;
+  flex:0 0 auto !important;
+  font-size:clamp(7px, .68vw, 9px) !important;
+  line-height:1.1 !important;
+  text-align:center !important;
+  white-space:normal !important;
+}
+
+/* 修正底部手牌文字：確保名稱與行動消耗不被其他樣式隱藏 */
+#myHand .card .ct,
+#myHand .card .cost{
+ display:block !important;
+ visibility:visible !important;
+ opacity:1 !important;
+ color:#27251f !important;
+ position:relative !important;
+ z-index:2 !important;
+}
+#myHand .card .ct{font-weight:800 !important; overflow-wrap:anywhere;}
+#myHand .card .cost{text-align:center !important; white-space:normal !important;}
+</style>
+</head>
+<body>
+<div id="app">
+ <section class="player-strip enemy">
+  <div class="player-meta">
+   <div class="avatar">敵</div><div class="meta-content">
+    <div class="name-row"><span>敵方玩家</span><span id="enemyHpText">100 / 100</span></div>
+    <div class="hp-track"><div id="enemyHpBar" class="hp-fill"></div></div>
+    <div class="meta-small">特性：尚未設定　｜　狀態：正常</div>
+   </div>
+  </div>
+  <div class="hand-panel">
+   <div class="hand-head"><span>敵方手牌</span><span id="enemyHandCount">10 張</span></div>
+   <div class="hand-viewport"><div class="hand-track" id="enemyHand"><span class="empty">敵方手牌內容隱藏</span></div></div>
+  </div>
+ </section>
+
+ <main id="middle">
+  <aside class="left-rail">
+   <section class="side-panel round-panel">
+    <div class="side-title">回合資訊</div>
+    <div class="stat"><b id="round">01</b><span>目前回合</span></div>
+    <div class="stat"><b id="phase">配置</b><span>階段</span></div>
+   </section>
+   <section class="side-panel enemy-status-panel">
+    <div class="side-title">敵方狀態</div>
+    <div class="stat"><b id="enemySideHp">100</b><span>生命值</span></div>
+    <div class="stat"><b id="enemyShield">0</b><span>護盾</span></div>
+    <div class="info-grid">
+     <div class="info-chip">功德<br><b id="enemyMerit">0</b></div>
+     <div class="info-chip">罪孽<br><b id="enemySin">0</b></div>
+    </div>
+    <div class="stat"><b id="enemyStatus">正常</b><span>目前狀態</span></div>
+   </section>
+  </aside>
+
+  <section class="battle-board">
+   <div class="action-zone" id="enemySlots">
+    <div class="slot"><span class="slot-num">敵方 1</span><span class="slot-label">行動位置</span></div>
+    <div class="slot"><span class="slot-num">敵方 2</span><span class="slot-label">行動位置</span></div>
+    <div class="slot"><span class="slot-num">敵方 3</span><span class="slot-label">行動位置</span></div>
+    <div class="slot"><span class="slot-num">敵方 4</span><span class="slot-label">行動位置</span></div>
+    <div class="slot"><span class="slot-num">敵方 5</span><span class="slot-label">行動位置</span></div>
+   </div>
+   <div class="board-divider"><span>戰鬥結算區</span></div>
+   <div class="action-zone" id="mySlots">
+    <div class="slot" data-slot="0"><span class="slot-num">我方 1</span><span class="slot-label">點選手牌後放置</span></div>
+    <div class="slot" data-slot="1"><span class="slot-num">我方 2</span><span class="slot-label">點選手牌後放置</span></div>
+    <div class="slot" data-slot="2"><span class="slot-num">我方 3</span><span class="slot-label">點選手牌後放置</span></div>
+    <div class="slot" data-slot="3"><span class="slot-num">我方 4</span><span class="slot-label">點選手牌後放置</span></div>
+    <div class="slot" data-slot="4"><span class="slot-num">我方 5</span><span class="slot-label">點選手牌後放置</span></div>
+   </div>
+   <div class="log" id="log">戰鬥紀錄：選擇下方手牌，再點選我方行動位置。</div>
+  </section>
+
+  <aside class="side-panel">
+   <div class="side-title">我方資訊</div>
+   <div class="stat"><b id="myHpText">100 / 100</b><span>生命值</span></div>
+   <div class="stat"><b id="myDeck">50</b><span>牌庫剩餘</span></div>
+   <div class="stat"><b id="myHandNum">10</b><span>手牌數量</span></div>
+   <div class="side-title">狀態</div>
+   <div class="info-grid"><div class="info-chip">功德<br><b id="merit">0</b></div><div class="info-chip">罪孽<br><b id="sin">0</b></div><div class="info-chip">護盾<br><b id="shield">0</b></div><div class="info-chip">棄牌<br><b id="discardCount">0</b></div></div>
+  </aside>
+ </main>
+
+ <section class="player-strip">
+  <div class="hand-panel">
+   <div class="hand-head"><span>我方手牌（可超過 10 張）</span><span id="handCount">10 張</span></div>
+   <div class="hand-viewport" id="myHandViewport"><div class="hand-track" id="myHand"></div></div>
+  </div>
+  <div class="player-meta">
+   <div class="avatar">我</div><div class="meta-content">
+    <div class="name-row"><span>我方玩家</span><span id="myHpTop">100 / 100</span></div>
+    <div class="hp-track"><div id="myHpBar" class="hp-fill"></div></div>
+    <div class="meta-small">特性：測試模式　｜　狀態：正常</div>
+   </div>
+  </div>
+ </section>
+ <div class="bottom-controls">
+  <button id="catalogBtn" class="secondary">卡牌資料庫</button>
+  <button id="deckBtn" class="secondary">自訂牌庫</button>
+  <button id="battleStartBtn" class="secondary">使用自訂牌組開始</button>
+  <button id="battleLogBtn" class="secondary">查看戰鬥紀錄</button>
+  <button id="resolveBtn">雙方揭示並結算</button>
+  <button id="nextRoundBtn" disabled>進入下一回合</button>
+  <button id="clearBtn" class="secondary">清空行動位</button>
+  <button id="resetBtn" class="secondary">重新開始</button>
+ </div>
+</div>
+<div id="toast"></div>
+<div class="modal-wrap" id="modalWrap"><div class="modal">
+ <h2 id="modalTitle">卡牌資料庫</h2><p id="modalText">目前收錄的測試卡牌；正式卡牌資料尚待匯入。</p>
+ <div id="modalChoices"></div><button id="closeModal">取消</button>
+</div></div>
+<script>
+/*
+ * v0.7 卡牌資料結構
+ * 目前六張卡仍是「測試卡」，不代表正式卡牌清單或完整規則。
+ * 每張卡統一欄位，未來正式卡牌只需依相同結構登錄。
+ */
+
+const CARD_DATABASE = [
+ {key:"attribute_shield",name:"屬性盾",type:"防禦",cost:1,description:"打出時選擇火焰、水或雷電；本次行動受到所選屬性傷害時減免 100%，並反射 10% 傷害。",effect:"attribute_shield",target:"self",damageType:null,value:0,duration:1,generated:false,source:"basic"},
+ {key:"dodge",name:"閃避",type:"防禦",cost:1,description:"50% 機率使本次行動受到的傷害降低 80%。",effect:"dodge",target:"self",damageType:null,value:80,duration:1,generated:false,source:"basic"},
+ {key:"defense",name:"防禦",type:"防禦",cost:1,description:"本次行動受到的物理傷害降低 80%。",effect:"defense",target:"self",damageType:"physical",value:80,duration:1,generated:false,source:"basic"},
+ {key:"heal",name:"治療",type:"治療",cost:1,description:"治療 2 點生命；若本次行動實際受到至少 1 點傷害，則只治療 1 點。",effect:"heal",target:"self",damageType:null,value:2,duration:null,generated:false,source:"basic"},
+ {key:"armor_break",name:"破甲",type:"控制",cost:1,description:"使敵方下一個行動的防禦效果失效。",effect:"armor_break",target:"opponent",damageType:null,value:1,duration:1,generated:false,source:"basic"},
+ {key:"bind",name:"禁錮",type:"控制",cost:1,description:"使敵方下一個行動無法閃避。",effect:"bind",target:"opponent",damageType:null,value:1,duration:1,generated:false,source:"basic"},
+ {key:"purify",name:"淨化",type:"輔助",cost:1,description:"抵抗本次行動期間受到的負面效果。",effect:"purify",target:"self",damageType:null,value:1,duration:1,generated:false,source:"basic"},
+ {key:"basic_sword",name:"基礎劍招",type:"攻擊",cost:1,description:"對敵方造成 3 點物理傷害。",effect:"sword",target:"opponent",damageType:"physical",value:3,duration:null,generated:false,source:"basic"},
+ {key:"fire_enchant",name:"火焰附魔",type:"附魔",cost:1,description:"下一次基礎攻擊額外造成 2 點火焰傷害。",effect:"enchant_fire",target:"self",damageType:"fire",value:2,duration:null,generated:false,source:"basic"},
+ {key:"water_enchant",name:"流水附魔",type:"附魔",cost:1,description:"下一次基礎攻擊額外造成 1 點水屬性傷害，並治療自身 1 點生命。",effect:"enchant_water",target:"self",damageType:"water",value:1,duration:null,generated:false,source:"basic"},
+ {key:"lightning_enchant",name:"雷電附魔",type:"附魔",cost:1,description:"下一次基礎攻擊額外造成 1 點雷屬性傷害，並有 20% 基礎機率打斷敵方蓄力。",effect:"enchant_lightning",target:"self",damageType:"lightning",value:1,duration:null,generated:false,source:"basic"},
+ {key:"sharp",name:"鋒利",type:"輔助",cost:1,description:"消耗 1 行動，使下一次基礎劍招傷害增加 2。",effect:"sharp",target:"self",damageType:null,value:2,duration:null,generated:false,source:"basic"}
+];
+const CARD_DB_VERSION = "1.0";
+
+let hand=[],selected=null,slots=[null,null,null,null,null],enemySlots=[null,null,null,null,null];
+let hp=100,maxHp=100,enemyHp=100,enemyShield=0,enemyMerit=0,enemySin=0;
+let deck=50,enemyDeck=50,enemyHandCount=10,round=1,merit=0,sin=0,shield=0,attack=0,discardPile=[];
+let awaitingNextRound=false, battleEnded=false;
+const $=id=>document.getElementById(id);
+
+function makeCard(template, generated=false){
+ return {
+  instanceId: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())),
+  templateKey:template.key,name:template.name,type:template.type,cost:template.cost,
+  description:template.description,effect:template.effect,target:template.target,
+  damageType:template.damageType,value:template.value,duration:template.duration,
+  generated:generated,source:generated?"trait_generated":template.source,selectedElement:null
+ };
+}
+function log(s){$("log").textContent="戰鬥紀錄："+s}
+function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",1800)}
+function getCardDescription(c){return c.description || "尚無效果說明"}
+function renderHand(){
+ const area=$("myHand");
+ area.innerHTML="";
+ hand.forEach((c)=>{
+  const el=document.createElement("button");
+  el.type="button";
+  el.className="card"+(selected===c.instanceId?" selected":"");
+  el.style.display="flex";
+  el.style.flexDirection="column";
+  el.style.justifyContent="center";
+  el.style.gap="7px";
+  el.style.minHeight="0";
+  el.style.alignItems="stretch";
+  el.style.color="#27251f";
+  el.style.whiteSpace="normal";
+  el.style.visibility="visible";
+  el.style.opacity="1";
+
+  const name=document.createElement("span");
+  name.className="ct";
+  name.textContent=c.name || c.cardName || "未命名卡牌";
+  name.style.display="block";
+  name.style.visibility="visible";
+  name.style.opacity="1";
+  name.style.color="#27251f";
+  name.style.fontWeight="800";
+  name.style.fontSize="11px";
+  name.style.lineHeight="1.15";
+  name.style.flex="0 1 auto";
+  name.style.textAlign="center";
+  name.style.whiteSpace="normal";
+  name.style.overflowWrap="anywhere";
+
+  const cost=document.createElement("span");
+  cost.className="cost";
+  const actionCost=c.cost ?? c.actionCost ?? 1;
+  cost.textContent=`消耗 ${actionCost} 行動`;
+  cost.style.display="block";
+  cost.style.visibility="visible";
+  cost.style.opacity="1";
+  cost.style.color="#27251f";
+  cost.style.fontWeight="800";
+  cost.style.fontSize="10px";
+  cost.style.textAlign="center";
+  cost.style.whiteSpace="normal";
+  cost.style.flex="0 0 auto";
+  cost.style.lineHeight="1.1";
+
+  el.append(name,cost);
+  el.title="點選選取，再點選行動位置";
+  el.setAttribute("aria-label",`${name.textContent}，消耗 ${actionCost} 行動`);
+  el.onclick=()=>{if(awaitingNextRound||battleEnded)return;selected=selected===c.instanceId?null:c.instanceId;renderHand();if(selected)toast("已選取「"+c.name+"」，再點選一個我方行動位置");};
+  area.appendChild(el);
+ });
+ const n=hand.length;
+ $("handCount").textContent=n+" 張";
+ $("myHandNum").textContent=n;
+}
+
+function htmlText(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));}
+function showShieldElementPicker(card, onChoose){
+ $("modalTitle").textContent="選擇屬性盾";
+ $("modalText").textContent="選擇這張屬性盾要抵擋的傷害屬性。";
+ const area=$("modalChoices");area.innerHTML="";
+ [["fire","火焰"],["water","水"],["thunder","雷電"]].forEach(([key,label])=>{
+  const button=document.createElement("button");
+  button.className="choice";button.textContent=label;button.style.width="100%";
+  button.onclick=()=>{card.selectedElement=key;$("modalWrap").style.display="none";onChoose();};
+  area.appendChild(button);
+ });
+ $("closeModal").textContent="取消";$("modalWrap").style.display="flex";
+}
+function renderSlots(){
+ document.querySelectorAll("#mySlots .slot").forEach((el,i)=>{
+  const c=slots[i];el.classList.toggle("filled",!!c);
+  el.innerHTML=c?`<span class="slot-num">我方 ${i+1}</span><span class="placed">${htmlText(c.name)}</span><span class="slot-label">消耗 ${c.cost} 行動</span><button data-remove="${i}">移除</button>`:`<span class="slot-num">我方 ${i+1}</span><span class="slot-label">點選手牌後放置</span>`;
+ });
+ document.querySelectorAll("[data-remove]").forEach(b=>b.onclick=e=>{e.stopPropagation();const i=+b.dataset.remove;if(slots[i].effect==="attribute_shield")slots[i].selectedElement=null;hand.push(slots[i]);slots[i]=null;renderAll();});
+ document.querySelectorAll("#mySlots .slot").forEach((el,i)=>el.onclick=e=>{
+  if(awaitingNextRound||battleEnded)return;
+  if(e.target.tagName==="BUTTON")return;
+  if(!selected){if(slots[i]){hand.push(slots[i]);slots[i]=null;renderAll()}else toast("請先選擇一張手牌");return}
+  if(slots[i]){toast("此行動位置已有卡牌");return}
+  const idx=hand.findIndex(c=>c.instanceId===selected);if(idx<0)return;
+  const chosen=hand[idx];
+  const placeChosen=()=>{
+   const currentIndex=hand.findIndex(c=>c.instanceId===chosen.instanceId);
+   if(currentIndex<0||slots[i])return;
+   slots[i]=hand.splice(currentIndex,1)[0];selected=null;renderAll();
+  };
+  if(chosen.effect==="attribute_shield"&&!chosen.selectedElement){
+   showShieldElementPicker(chosen,placeChosen);
+   return;
+  }
+  placeChosen();
+ });
+}
+function renderEnemySlots(){
+ const area=$("enemySlots");area.innerHTML="";
+ enemySlots.forEach((c,i)=>{
+  const el=document.createElement("div");el.className="slot"+(c?" filled":"");
+  el.innerHTML=c?`<span class="slot-num">敵方 ${i+1}</span><span class="placed">${htmlText(c.name)}</span><span class="slot-label">消耗 ${c.cost} 行動</span>`:`<span class="slot-num">敵方 ${i+1}</span><span class="slot-label">等待揭示</span>`;
+  area.appendChild(el);
+ });
+}
+function planEnemyActions(){
+ enemySlots=[null,null,null,null,null];
+ const count=Math.min(5,enemyHandCount),order=[0,1,2,3,4].sort(()=>Math.random()-.5);
+ for(let n=0;n<count;n++){
+  const card=makeCard(CARD_DATABASE[Math.floor(Math.random()*CARD_DATABASE.length)]);
+  if(card.effect==="attribute_shield")card.selectedElement=["fire","water","thunder"][Math.floor(Math.random()*3)];
+  enemySlots[order[n]]=card;
+ }
+ enemyHandCount-=count;
+}
+function applyDamageTo(side,amount){
+ let remaining=Math.max(0,amount);
+ if(side==="enemy"&&enemyShield>0){const blocked=Math.min(enemyShield,remaining);enemyShield-=blocked;remaining-=blocked;}
+ if(side==="player"&&shield>0){const blocked=Math.min(shield,remaining);shield-=blocked;remaining-=blocked;}
+ if(side==="enemy")enemyHp=Math.max(0,enemyHp-remaining);else hp=Math.max(0,hp-remaining);
+ return remaining;
+}
+function renderStats(){
+ $("myHpText").textContent=hp+" / "+maxHp;$("myHpTop").textContent=hp+" / "+maxHp;
+ $("myHpBar").style.width=Math.max(0,hp/maxHp*100)+"%";
+ $("enemyHpText").textContent=enemyHp+" / 100";$("enemyHpBar").style.width=Math.max(0,enemyHp)+"%";
+ $("enemySideHp").textContent=enemyHp;$("enemyShield").textContent=enemyShield;
+ $("enemyMerit").textContent=enemyMerit;$("enemySin").textContent=enemySin;
+ $("enemyStatus").textContent=enemyHp<=0?"戰敗":"正常";$("enemyHandCount").textContent=enemyHandCount+" 張";
+ $("myDeck").textContent=deck;$("round").textContent=String(round).padStart(2,"0");
+ $("merit").textContent=merit;$("sin").textContent=sin;$("shield").textContent=shield;$("discardCount").textContent=discardPile.length;
+}
+function renderAll(){renderHand();renderSlots();renderEnemySlots();renderStats();}
+function drawCard(generated=false){
+ if(awaitingNextRound||battleEnded){toast("請先進入下一回合");return}
+ if(!generated&&deck<=0){toast("牌庫已空");return}
+ if(!generated)deck--;
+ const template=CARD_DATABASE[Math.floor(Math.random()*CARD_DATABASE.length)];
+ hand.push(makeCard(template,generated));renderAll();
+ log(generated?"測試按鈕模擬特性生成：卡牌直接加入手牌，不進牌庫":"手動抽取一張測試卡牌");
+}
+function showCatalog(){
+ $("modalTitle").textContent="卡牌資料庫 v"+CARD_DB_VERSION;
+ $("modalText").textContent="目前只有六張測試卡。欄位已標準化；正式卡牌與特性效果尚未匯入，避免擅自編造規則。";
+ const area=$("modalChoices");area.innerHTML="";
+ CARD_DATABASE.forEach(c=>{
+  const row=document.createElement("div");row.className="choice";
+  row.style.display="block";
+  row.innerHTML=`<b>${htmlText(c.name)}</b>　<span style="color:#e5cc8c">${htmlText(c.type)}</span><br><span>${htmlText(c.description)}</span><br><small>費用 ${c.cost}｜效果 ${htmlText(c.effect)}｜目標 ${htmlText(c.target)}｜傷害屬性 ${htmlText(c.damageType||"無")}｜資料來源：測試</small>`;
+  area.appendChild(row);
+ });
+ $("closeModal").textContent="關閉";$("modalWrap").style.display="flex";
+}
+function resolve(){
+ if(awaitingNextRound||battleEnded)return;
+ $("phase").textContent="揭示";
+ if(!slots.some(Boolean)){toast("請先配置至少一個行動");$("phase").textContent="配置";return}
+ planEnemyActions();renderEnemySlots();$("phase").textContent="結算";
+ const lines=[];
+ for(let i=0;i<5;i++){
+  const p=slots[i],e=enemySlots[i];if(!p&&!e)continue;
+  let pDamage=0,eDamage=0,pHeal=0,eHeal=0,pShield=0,eShield=0;
+  const inspect=(c,owner)=>{
+   if(!c)return;
+   const isPlayer=owner==="player";
+   if(c.effect==="damage"){if(isPlayer)pDamage+=c.value;else eDamage+=c.value;}
+   else if(c.effect==="heal"){if(isPlayer)pHeal+=c.value;else eHeal+=c.value;}
+   else if(c.effect==="shield"){if(isPlayer)pShield+=c.value;else eShield+=c.value;}
+  };
+  inspect(p,"player");inspect(e,"enemy");
+  shield+=pShield;enemyShield+=eShield;
+  hp=Math.min(maxHp,hp+pHeal);enemyHp=Math.min(100,enemyHp+eHeal);
+  const dealtToEnemy=applyDamageTo("enemy",pDamage),dealtToPlayer=applyDamageTo("player",eDamage);
+  const desc=[];if(p)desc.push("我方「"+p.name+"」");if(e)desc.push("敵方「"+e.name+"」");
+  if(pDamage)desc.push("我方造成 "+dealtToEnemy+" 傷害");if(eDamage)desc.push("敵方造成 "+dealtToPlayer+" 傷害");
+  if(pHeal)desc.push("我方恢復 "+pHeal);if(eHeal)desc.push("敵方恢復 "+eHeal);
+  if(pShield)desc.push("我方獲得 "+pShield+" 護盾");if(eShield)desc.push("敵方獲得 "+eShield+" 護盾");
+  lines.push("位置 "+(i+1)+"："+desc.join("；"));
+ }
+ log(lines.join("｜")||"本回合沒有行動");
+ selected=null;
+ awaitingNextRound=true;
+ battleEnded=(enemyHp<=0||hp<=0);
+ $("phase").textContent=battleEnded?"對戰結束":"等待下一回合";
+ $("resolveBtn").disabled=true;
+ $("nextRoundBtn").disabled=battleEnded;
+ $("clearBtn").disabled=true;
+ renderAll();
+ if(battleEnded){
+  const result=enemyHp<=0&&hp<=0?"雙方同時戰敗":enemyHp<=0?"敵方生命值歸零":"我方生命值歸零";
+  toast(result);log("測試對戰結束："+result);
+ }else{
+  toast("本回合結算完成。確認戰鬥結果後，點擊「進入下一回合」");
+ }
+}
+function enterNextRound(){
+ if(!awaitingNextRound||battleEnded)return;
+ slots=[null,null,null,null,null];enemySlots=[null,null,null,null,null];
+ const playerDraw=Math.min(10,deck);deck-=playerDraw;
+ for(let i=0;i<playerDraw;i++)hand.push(makeCard(CARD_DATABASE[Math.floor(Math.random()*CARD_DATABASE.length)]));
+ const enemyDraw=Math.min(10,enemyDeck);enemyDeck-=enemyDraw;enemyHandCount+=enemyDraw;
+ round++;
+ awaitingNextRound=false;
+ $("phase").textContent="配置";
+ $("resolveBtn").disabled=false;$("nextRoundBtn").disabled=true;
+ $("clearBtn").disabled=false;
+ renderAll();
+ log("進入第 "+round+" 回合；雙方各抽取最多 10 張");
+ toast("已進入第 "+round+" 回合");
+}
+$("catalogBtn").onclick=showCatalog;
+$("resolveBtn").onclick=resolve;
+$("nextRoundBtn").onclick=enterNextRound;
+$("clearBtn").onclick=()=>{if(awaitingNextRound||battleEnded)return;slots.forEach(c=>{if(c){if(c.effect==="attribute_shield")c.selectedElement=null;hand.push(c)}});slots=[null,null,null,null,null];selected=null;renderAll();log("已清空行動位，卡牌返回手牌");};
+$("resetBtn").onclick=()=>{
+ hand=CARD_DATABASE.concat(CARD_DATABASE.slice(0,4)).map(c=>makeCard(c));
+ awaitingNextRound=false;battleEnded=false;
+ $("resolveBtn").disabled=false;$("nextRoundBtn").disabled=true;$("clearBtn").disabled=false;
+ selected=null;slots=[null,null,null,null,null];hp=100;enemyHp=100;enemyShield=0;enemyMerit=0;enemySin=0;
+ deck=50;enemyDeck=50;enemyHandCount=10;enemySlots=[null,null,null,null,null];round=1;merit=0;sin=0;shield=0;attack=0;
+ $("phase").textContent="配置";renderAll();log("遊戲已重新開始");
+};
+function closeCatalogModal(){
+ $("modalWrap").style.display="none";
+}
+$("closeModal").addEventListener("click",closeCatalogModal);
+$("modalWrap").addEventListener("click",e=>{
+ if(e.target===$("modalWrap"))closeCatalogModal();
+});
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape" && $("modalWrap").style.display==="flex")closeCatalogModal();
+});
+hand=CARD_DATABASE.concat(CARD_DATABASE.slice(0,4)).map(c=>makeCard(c));renderAll();
+
+/* ===== v1.1：正式基礎卡牌、戰鬥紀錄、自訂牌庫 ===== */
+let battleHistory=[];
+let customDeckCounts={};
+let playerDeckPile=[];
+let nextRoundFlags={armorBreak:false,bind:false};
+let enchantments={
+ player:{fire:0,water:0,lightning:0,sharp:0},
+ enemy:{fire:0,water:0,lightning:0,sharp:0}
+};
+let currentActionDefense={player:null,enemy:null};
+let purifyThisAction={player:false,enemy:false};
+
+CARD_DATABASE.forEach(c=>{customDeckCounts[c.key]=5;});
+function addBattleLog(message){
+ const stamp=`第 ${round} 回合`;
+ battleHistory.push(`${stamp}｜${message}`);
+ if(battleHistory.length>500)battleHistory.shift();
+ $("log").textContent="戰鬥紀錄："+message;
+}
+function log(s){addBattleLog(s);}
+function makeShuffledDeck(counts){
+ const pile=[];
+ CARD_DATABASE.forEach(c=>{for(let i=0;i<(counts[c.key]||0);i++)pile.push(c.key);});
+ for(let i=pile.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pile[i],pile[j]]=[pile[j],pile[i]];}
+ return pile;
+}
+function recycleDiscardIntoDeck(){
+ if(playerDeckPile.length>0||discardPile.length===0)return 0;
+ const recycled=discardPile
+  .map(card=>card.templateKey)
+  .filter(key=>CARD_DATABASE.some(template=>template.key===key));
+ if(recycled.length===0)return 0;
+ discardPile=[];
+ for(let i=recycled.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [recycled[i],recycled[j]]=[recycled[j],recycled[i]];
+ }
+ playerDeckPile.push(...recycled);
+ addBattleLog(`牌庫不足，將棄牌區 ${recycled.length} 張卡牌重洗並放回牌庫`);
+ return recycled.length;
+}
+function drawFromPlayerDeck(amount){
+ let drawn=0;
+ while(drawn<amount){
+  if(playerDeckPile.length===0&&recycleDiscardIntoDeck()===0)break;
+  const key=playerDeckPile.shift(),template=CARD_DATABASE.find(c=>c.key===key);
+  if(template){hand.push(makeCard(template));drawn++;}
+ }
+ deck=playerDeckPile.length;
+ return drawn;
+}
+function drawCard(generated=false){
+ if(awaitingNextRound||battleEnded){toast("請先進入下一回合");return;}
+ // 牌庫為空時仍允許進入抽牌函式，由 drawFromPlayerDeck 負責重洗棄牌區。
+ if(generated){
+  const template=CARD_DATABASE[Math.floor(Math.random()*CARD_DATABASE.length)];
+  hand.push(makeCard(template,true));renderAll();addBattleLog(`特性生成「${template.name}」：直接加入手牌，不進入牌庫`);
+ }else{
+  const n=drawFromPlayerDeck(1);renderAll();addBattleLog(n?`抽取「${hand[hand.length-1].name}」`:"牌庫已空");
+ }
+}
+function showCatalog(){
+ $("modalTitle").textContent="正式基礎卡牌資料庫 v"+CARD_DB_VERSION;
+ $("modalText").textContent="目前收錄正式基礎卡牌。每張卡牌消耗 1 行動。";
+ const area=$("modalChoices");area.innerHTML="";
+ CARD_DATABASE.forEach(c=>{
+  const row=document.createElement("div");row.className="choice";row.style.display="block";
+  row.innerHTML=`<div><b>${htmlText(c.name)}</b>　<span style="color:#e5cc8c">${htmlText(c.type)}</span></div><div>${htmlText(c.description)}</div><small>行動消耗 ${c.cost}｜卡牌編號：${htmlText(c.key)}</small>`;
+  area.appendChild(row);
+ });
+ $("closeModal").textContent="關閉";$("modalWrap").style.display="flex";
+}
+function openDeckBuilder(){
+ $("modalTitle").textContent="自訂牌組";
+ $("modalText").textContent="牌組必須剛好 60 張才能開始。每種基礎卡牌最多可加入 60 張。";
+ const area=$("modalChoices");area.innerHTML="";
+ const actions=document.createElement("div");actions.className="deck-actions";
+ actions.innerHTML=`<button class="mini-btn" id="saveDeckBtn">保存牌組</button><button class="mini-btn" id="loadDeckBtn">讀取牌組</button><button class="mini-btn" id="clearDeckBtn">清空牌組</button>`;
+ area.appendChild(actions);
+ CARD_DATABASE.forEach(c=>{
+  const row=document.createElement("div");row.className="deck-row";
+  const left=document.createElement("div");
+  left.innerHTML=`<b>${htmlText(c.name)}</b><small>${htmlText(c.type)}｜行動消耗 ${c.cost}</small>`;
+  const counts=document.createElement("div");
+  counts.innerHTML=`牌組：<b id="deck-${c.key}">${customDeckCounts[c.key]||0}</b> / 60`;
+  const buttons=document.createElement("div");
+  const minus=document.createElement("button");minus.textContent="−";minus.className="mini-btn";
+  minus.onclick=()=>{if((customDeckCounts[c.key]||0)>0){customDeckCounts[c.key]--;refreshDeckCounts();}};
+  const plus=document.createElement("button");plus.textContent="＋";plus.className="mini-btn";
+  plus.onclick=()=>{if((customDeckCounts[c.key]||0)<60){customDeckCounts[c.key]=(customDeckCounts[c.key]||0)+1;refreshDeckCounts();}else toast("每種基礎卡牌最多加入 60 張");};
+  buttons.append(minus,plus);row.append(left,counts,buttons);area.appendChild(row);
+ });
+ const summary=document.createElement("div");summary.className="deck-summary";summary.id="deckSummary";area.appendChild(summary);
+ refreshDeckCounts();
+ $("saveDeckBtn").onclick=()=>{
+  try{localStorage.setItem("cardBattleCustomDeckV12",JSON.stringify({customDeckCounts}));toast("牌組已保存");}
+  catch(e){toast("保存失敗，瀏覽器可能限制本機儲存");}
+ };
+ $("loadDeckBtn").onclick=()=>{
+  try{
+   const saved=JSON.parse(localStorage.getItem("cardBattleCustomDeckV12")||"null");
+   if(!saved)throw new Error("沒有保存資料");
+   CARD_DATABASE.forEach(c=>customDeckCounts[c.key]=Math.max(0,Math.min(60,Math.floor(Number(saved.customDeckCounts?.[c.key]??0))||0)));
+   openDeckBuilder();toast("已讀取保存的牌組");
+  }catch(e){toast("沒有可讀取的保存牌組");}
+ };
+ $("clearDeckBtn").onclick=()=>{CARD_DATABASE.forEach(c=>customDeckCounts[c.key]=0);openDeckBuilder();};
+ $("closeModal").textContent="關閉";$("modalWrap").style.display="flex";
+}
+function refreshDeckCounts(){
+ CARD_DATABASE.forEach(c=>{
+  const count=$("deck-"+c.key);
+  if(count)count.textContent=customDeckCounts[c.key]||0;
+ });
+ const total=CARD_DATABASE.reduce((sum,c)=>sum+(customDeckCounts[c.key]||0),0);
+ const summary=$("deckSummary");
+ if(summary){
+  summary.innerHTML=`<b>目前牌組總張數：${total} / 60</b><span>${total===60?"符合開始條件":total<60?"尚差 "+(60-total)+" 張":"超出 "+(total-60)+" 張"}</span>`;
+ }
+ const startButton=$("battleStartBtn");
+ if(startButton)startButton.disabled=total!==60;
+}
+function showBattleLog(){
+ $("modalTitle").textContent="戰鬥紀錄";
+ $("modalText").textContent=battleHistory.length?`共 ${battleHistory.length} 筆紀錄，最新紀錄顯示於下方。`:"目前尚無戰鬥紀錄。";
+ const area=$("modalChoices");area.innerHTML="";
+ battleHistory.forEach((line,i)=>{const row=document.createElement("div");row.className="choice";row.textContent=`${i+1}. ${line}`;area.appendChild(row);});
+ area.scrollTop=area.scrollHeight;
+ $("closeModal").textContent="關閉";$("modalWrap").style.display="flex";
+}
+function startCustomBattle(){
+ const total=CARD_DATABASE.reduce((s,c)=>s+(customDeckCounts[c.key]||0),0);
+ if(total!==60){toast(`牌組必須剛好 60 張，目前為 ${total} 張`);openDeckBuilder();return;}
+ hand=[];slots=[null,null,null,null,null];enemySlots=[null,null,null,null,null];
+ playerDeckPile=makeShuffledDeck(customDeckCounts);deck=playerDeckPile.length;
+ hp=100;enemyHp=100;shield=0;enemyShield=0;merit=0;sin=0;attack=0;enemyMerit=0;enemySin=0;
+ enemyDeck=50;enemyHandCount=10;round=1;awaitingNextRound=false;battleEnded=false;selected=null;
+ enchantments={player:{fire:0,water:0,lightning:0,sharp:0},enemy:{fire:0,water:0,lightning:0,sharp:0}};nextRoundFlags={armorBreak:false,bind:false};
+ battleHistory=[];discardPile=[];drawFromPlayerDeck(10);
+ $("phase").textContent="配置";$("resolveBtn").disabled=false;$("nextRoundBtn").disabled=true;
+ $("clearBtn").disabled=false;
+ renderAll();addBattleLog(`使用自訂牌組開始戰鬥，牌組共 ${total} 張，初始抽取 ${hand.length} 張`);
+ $("modalWrap").style.display="none";toast("已使用自訂牌組開始新戰鬥");
+}
+function applyBasicDamage(target,amount,type,defense,canDodge,owner){
+ let reduction=0,reflected=0;
+ const isPlayer=target==="player";
+ const flags=isPlayer?currentActionDefense.player:currentActionDefense.enemy;
+ if(flags?.armorBroken)defense=null;
+ if(type==="physical"&&defense==="defense")reduction=Math.max(reduction,0.8);
+ if(canDodge)reduction=Math.max(reduction,0.8);
+ if(flags?.attributeShield&&((flags.attributeShield==="thunder"&&type==="lightning")||flags.attributeShield===type)) {reduction=1;reflected=Math.floor(amount*0.1);}
+ const final=Math.max(0,Math.ceil(amount*(1-reduction)));
+ const dealt=applyDamageTo(target,final);
+ if(reflected>0){
+  if(target==="player")enemyHp=Math.max(0,enemyHp-reflected);
+  else hp=Math.max(0,hp-reflected);
+ }
+ return {dealt,reflected,reduction};
+}
+function resolve(){
+ if(awaitingNextRound||battleEnded)return;
+ if(!slots.some(Boolean)){toast("請先配置至少一個行動");$("phase").textContent="配置";return;}
+ $("phase").textContent="揭示";planEnemyActions();renderEnemySlots();$("phase").textContent="結算";
+ const lines=[];
+ // Flags apply to the next opposing occupied action, not the whole round.
+ let pending={player:{armorBroken:false,cannotDodge:false},enemy:{armorBroken:false,cannotDodge:false}};
+ for(let i=0;i<5;i++){
+  const p=slots[i],e=enemySlots[i];if(!p&&!e)continue;
+  const line=[`位置 ${i+1}`];if(p)line.push(`我方「${p.name}」`);if(e)line.push(`敵方「${e.name}」`);
+  const pFlags={...pending.player},eFlags={...pending.enemy};
+  // Consume effects that were already waiting before this position; effects applied below
+  // remain queued for the target's following action, even when both act simultaneously here.
+  if(p){pending.player.armorBroken=false;pending.player.cannotDodge=false;}
+  if(e){pending.enemy.armorBroken=false;pending.enemy.cannotDodge=false;}
+  const pDefense=p?.effect==="defense"?"defense":null,eDefense=e?.effect==="defense"?"defense":null;
+  const pShield=p?.effect==="attribute_shield",eShield=e?.effect==="attribute_shield";
+  const pDodge=p?.effect==="dodge",eDodge=e?.effect==="dodge";
+  const pPurify=p?.effect==="purify",ePurify=e?.effect==="purify";
+  // Defensive effects are established before simultaneous damage at this position.
+  currentActionDefense.player={...pFlags,defense:pDefense,attributeShield:pShield? p.selectedElement:null,cannotDodge:pFlags.cannotDodge};
+  currentActionDefense.enemy={...eFlags,defense:eDefense,attributeShield:eShield? e.selectedElement:null,cannotDodge:eFlags.cannotDodge};
+  // Offensive / setup effects.
+  const pAttack={physical:0,fire:0,water:0,lightning:0},eAttack={physical:0,fire:0,water:0,lightning:0};
+  let pHeal=0,eHeal=0;
+  const process=(c,attacker,attackObj)=>{
+   if(!c)return;
+   const target=attacker==="player"?"enemy":"player";
+   if(c.effect==="sword"){
+    const ench=enchantments[attacker];
+    attackObj.physical+=c.value+(ench.sharp>0?ench.sharp:0);
+    if(ench.sharp>0)ench.sharp=0;
+    ["fire","water","lightning"].forEach(t=>{if(ench[t]>0){attackObj[t]+=ench[t];ench[t]=0;}});
+    if(attackObj.water>0){if(attacker==="player")pHeal+=1;else eHeal+=1;}
+    if(attackObj.lightning>0&&Math.random()<0.2)line.push("雷電附魔觸發打斷判定；目前敵方沒有蓄力狀態可打斷");
+   }else if(c.effect==="enchant_fire")enchantments[attacker].fire=2;
+   else if(c.effect==="enchant_water")enchantments[attacker].water=1;
+   else if(c.effect==="enchant_lightning")enchantments[attacker].lightning=1;
+   else if(c.effect==="sharp")enchantments[attacker].sharp=2;
+   else if(c.effect==="heal"){if(attacker==="player")pHeal+=2;else eHeal+=2;}
+   else if(c.effect==="armor_break"){if(!((attacker==="player"&&pPurify)||(attacker==="enemy"&&ePurify)))pending[target].armorBroken=true;else line.push("淨化抵抗破甲");}
+   else if(c.effect==="bind"){if(!((attacker==="player"&&pPurify)||(attacker==="enemy"&&ePurify)))pending[target].cannotDodge=true;else line.push("淨化抵抗禁錮");}
+  };
+  process(p,"player",pAttack);process(e,"enemy",eAttack);
+  // Both sides' attacks are calculated before checking defeat.
+  const resolveSide=(target,atk,defense,dodge,flags,attacker)=>{
+   let total=0;
+   const dodgeSucceeded=!!dodge&&!flags.cannotDodge&&Math.random()<0.5;
+   for(const [type,amount] of Object.entries(atk)){
+    if(!amount)continue;
+    const r=applyBasicDamage(target,amount,type,defense,dodgeSucceeded,attacker);
+    total+=r.dealt;
+    if(r.reflected)line.push(`${target==="player"?"我方":"敵方"}反射 ${r.reflected}`);
+   }
+   return total;
+  };
+  const toEnemy=resolveSide("enemy",pAttack,pDefense,pDodge,eFlags,"player");
+  const toPlayer=resolveSide("player",eAttack,eDefense,eDodge,pFlags,"enemy");
+  if(toEnemy)line.push(`我方對敵方造成 ${toEnemy} 傷害`);
+  if(toPlayer)line.push(`敵方對我方造成 ${toPlayer} 傷害`);
+  if(pHeal){const actual=p?.effect==="heal"&&toPlayer>0?1:pHeal;hp=Math.min(maxHp,hp+actual);line.push(`我方治療 ${actual}`);}
+  if(eHeal){const actual=e?.effect==="heal"&&toEnemy>0?1:eHeal;enemyHp=Math.min(100,enemyHp+actual);line.push(`敵方治療 ${actual}`);}
+  if(p?.effect==="attribute_shield")line.push(`我方啟用${({fire:"火焰",water:"水",thunder:"雷"})[p.selectedElement]||"未選擇"}屬性盾`);
+  if(e?.effect==="attribute_shield")line.push(`敵方啟用${({fire:"火焰",water:"水",thunder:"雷"})[e.selectedElement]||"未選擇"}屬性盾`);
+  if(p?.effect==="defense")line.push("我方物理傷害減免 80%");
+  if(e?.effect==="defense")line.push("敵方物理傷害減免 80%");
+  if(p?.effect==="dodge"||e?.effect==="dodge")line.push("閃避判定已執行（50% 機率減傷 80%）");
+  lines.push(line.join("；"));
+  // Consume a previously pending debuff only when its target performs an action.
+  if(p){pending.player.armorBroken=false;pending.player.cannotDodge=false;}
+  if(e){pending.enemy.armorBroken=false;pending.enemy.cannotDodge=false;}
+  if(hp<=0||enemyHp<=0)break;
+ }
+ discardPile.push(...hand,...slots.filter(Boolean));
+ hand=[];
+ battleHistory.push(...lines.map(x=>`第 ${round} 回合｜${x}`));
+ $("log").textContent="戰鬥紀錄："+(lines.join("｜")||"本回合沒有行動");
+ selected=null;awaitingNextRound=true;battleEnded=(enemyHp<=0||hp<=0);
+ $("phase").textContent=battleEnded?"對戰結束":"等待下一回合";
+ $("resolveBtn").disabled=true;$("nextRoundBtn").disabled=battleEnded;
+ $("clearBtn").disabled=true;
+ renderAll();
+ if(battleEnded){const result=enemyHp<=0&&hp<=0?"雙方同時戰敗":enemyHp<=0?"敵方生命值歸零":"我方生命值歸零";addBattleLog("對戰結束："+result);toast(result);}
+ else toast("本回合結算完成，確認結果後可進入下一回合");
+}
+function enterNextRound(){
+ if(!awaitingNextRound||battleEnded)return;
+ slots=[null,null,null,null,null];enemySlots=[null,null,null,null,null];
+ // 每回合固定嘗試抽取 10 張；若牌庫不足，drawFromPlayerDeck 會自動重洗棄牌區補足。
+ const playerDraw=drawFromPlayerDeck(10);
+ const enemyDraw=Math.min(10,enemyDeck);enemyDeck-=enemyDraw;enemyHandCount+=enemyDraw;
+ round++;awaitingNextRound=false;
+ $("phase").textContent="配置";$("resolveBtn").disabled=false;$("nextRoundBtn").disabled=true;
+ $("clearBtn").disabled=false;
+ renderAll();addBattleLog(`進入第 ${round} 回合；我方抽取 ${playerDraw} 張，敵方抽取 ${enemyDraw} 張`);
+ toast("已進入第 "+round+" 回合");
+}
+function resetGame(){
+ startCustomBattle();
+}
+$("catalogBtn").onclick=showCatalog;
+$("deckBtn").onclick=openDeckBuilder;
+$("battleLogBtn").onclick=showBattleLog;
+$("battleStartBtn").onclick=startCustomBattle;
+$("resetBtn").onclick=resetGame;
+$("resolveBtn").onclick=resolve;
+$("nextRoundBtn").onclick=enterNextRound;
+$("clearBtn").onclick=()=>{if(awaitingNextRound||battleEnded)return;slots.forEach(c=>{if(c){if(c.effect==="attribute_shield")c.selectedElement=null;hand.push(c)}});slots=[null,null,null,null,null];selected=null;renderAll();addBattleLog("清空行動位，卡牌返回手牌");};
+// Reset to an initial playable custom deck, using the editable starter deck composition.
+playerDeckPile=makeShuffledDeck(customDeckCounts);
+hand=[];discardPile=[];drawFromPlayerDeck(10);
+battleHistory=[];renderAll();addBattleLog("v1.1 正式基礎卡牌版本已載入。初始牌組採示範配置，可於自訂牌庫調整。");
+
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/multiplayer.js"></script>
+</body>
+</html>
